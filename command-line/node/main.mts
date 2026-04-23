@@ -1,17 +1,23 @@
-import { GoogleGenAI, Modality, type LiveServerMessage } from '@google/genai';
-import mic from 'mic';
-import Speaker from 'speaker';
+import { GoogleGenAI, Modality, type LiveServerMessage } from "@google/genai";
+import "dotenv/config";
+import mic from "mic";
+import Speaker from "speaker";
 
-const ai = new GoogleGenAI({});
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  throw new Error("api key not found");
+}
+const ai = new GoogleGenAI({ apiKey });
 // WARNING: Do not use API keys in client-side (browser based) applications
 // Consider using Ephemeral Tokens instead
 // More information at: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
 
 // --- Live API config ---
-const model = 'gemini-3.1-flash-live-preview';
+const model = "gemini-3.1-flash-live-preview";
 const config = {
   responseModalities: [Modality.AUDIO],
-  systemInstruction: "You are a helpful and friendly AI assistant.",
+  systemInstruction:
+    "You are a helpful and friendly AI assistant. Speak funny with mickey mouse voice!",
 };
 
 async function live() {
@@ -36,7 +42,7 @@ async function live() {
       bitDepth: 16,
       sampleRate: 24000,
     });
-    speaker.on('error', (err: Error) => console.error('Speaker error:', err));
+    speaker.on("error", (err: Error) => console.error("Speaker error:", err));
     process.stdin.pipe(speaker);
   }
 
@@ -49,10 +55,14 @@ async function live() {
         audioQueue.length = 0;
         continue;
       }
-      if (message.serverContent && message.serverContent.modelTurn && message.serverContent.modelTurn.parts) {
+      if (
+        message.serverContent &&
+        message.serverContent.modelTurn &&
+        message.serverContent.modelTurn.parts
+      ) {
         for (const part of message.serverContent.modelTurn.parts) {
           if (part.inlineData && part.inlineData.data) {
-            audioQueue.push(Buffer.from(part.inlineData.data, 'base64'));
+            audioQueue.push(Buffer.from(part.inlineData.data, "base64"));
           }
         }
       }
@@ -64,6 +74,7 @@ async function live() {
     while (true) {
       if (audioQueue.length === 0) {
         if (speaker) {
+          console.log("Speaker");
           // Destroy speaker if no more audio to avoid warnings from speaker library
           process.stdin.unpipe(speaker);
           speaker.end();
@@ -89,37 +100,37 @@ async function live() {
     model: model,
     config: config,
     callbacks: {
-      onopen: () => console.log('Connected to Gemini Live API'),
+      onopen: () => console.log("Connected to Gemini Live API"),
       onmessage: (message: LiveServerMessage) => responseQueue.push(message),
-      onerror: (e: ErrorEvent) => console.error('Error:', e.message),
-      onclose: (e: CloseEvent) => console.log('Closed:', e.reason),
+      onerror: (e: ErrorEvent) => console.error("Error:", e.message),
+      onclose: (e: CloseEvent) => console.log("Closed:", e.reason),
     },
   });
 
   // Setup Microphone for input
   const micInstance = mic({
-    rate: '16000',
-    bitwidth: '16',
-    channels: '1',
+    rate: "16000",
+    bitwidth: "16",
+    channels: "1",
   });
   const micInputStream = micInstance.getAudioStream();
 
-  micInputStream.on('data', (data: Buffer) => {
+  micInputStream.on("data", (data: Buffer) => {
     // API expects base64 encoded PCM data
     session.sendRealtimeInput({
       audio: {
-        data: data.toString('base64'),
-        mimeType: "audio/pcm;rate=16000"
-      }
+        data: data.toString("base64"),
+        mimeType: "audio/pcm;rate=16000",
+      },
     });
   });
 
-  micInputStream.on('error', (err: Error) => {
-    console.error('Microphone error:', err);
+  micInputStream.on("error", (err: Error) => {
+    console.error("Microphone error:", err);
   });
 
   micInstance.start();
-  console.log('Microphone started. Speak now...');
+  console.log("Microphone started. Speak now...");
 }
 
 live().catch(console.error);
